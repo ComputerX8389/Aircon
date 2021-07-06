@@ -35,9 +35,9 @@ int Speed;
 float Temp;
 float Humi;
 
-int Screeninterval=100;
-int RPMinterval=1000;
-int DHTinterval=2000;
+unsigned int Screeninterval=100;
+unsigned int RPMinterval=1000;
+unsigned int DHTinterval=2000;
 unsigned long PreviousScreenMillis=0;
 unsigned long PreviousRPMMillis=0;
 unsigned long PreviousDHTMillis=0;
@@ -62,8 +62,18 @@ const unsigned char epd_bitmap_Fan4 [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0xfe, 0xe0, 0x01, 0xe0, 0xfd, 0xe0, 0x00, 0xe6, 0xf0, 0x6f, 0x0f, 0xff, 
 	0xef, 0xff, 0x0f, 0x60, 0xf6, 0x70, 0x00, 0x78, 0xff, 0x78, 0x00, 0x70, 0xff, 0x80, 0x00, 0x00
 };
+// 'celsius', 16x16px
+const unsigned char epd_bitmap_celsius [] PROGMEM = {
+	0x00, 0x00, 0x70, 0xf8, 0x53, 0xfe, 0x53, 0x06, 0x73, 0x00, 0x03, 0x00, 0x03, 0x00, 0x03, 0x00, 
+	0x03, 0x00, 0x03, 0x00, 0x03, 0x00, 0x03, 0x00, 0x03, 0x06, 0x03, 0xfe, 0x00, 0xf8, 0x00, 0x00
+};
+// 'Humidity', 16x16px
+const unsigned char epd_bitmap_Humidity [] PROGMEM = {
+	0x01, 0x80, 0x03, 0xc0, 0x03, 0xc0, 0x07, 0xe0, 0x0f, 0xf0, 0x0f, 0xf0, 0x13, 0xc8, 0x33, 0x8c, 
+	0x3f, 0x1c, 0x7e, 0x3e, 0x7c, 0x7e, 0x78, 0xfe, 0x71, 0xce, 0x33, 0xcc, 0x1f, 0xf8, 0x07, 0xe0
+};
 
-// Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 192)
+// Array of all fans bitmaps for convenience
 const int epd_bitmap_allArray_LEN = 4;
 const unsigned char* epd_bitmap_allArray[4] = {
 	epd_bitmap_Fan1,
@@ -72,21 +82,14 @@ const unsigned char* epd_bitmap_allArray[4] = {
 	epd_bitmap_Fan4
 };
 
+#define PotX 10
+#define PotY 0
 #define FanRPMX 64
 #define FanRPMY 0
-
-void setPwmDuty() {
-  Speed = map(analogRead(PotPin), 0, 1024, 0, 100);
-  if(Speed > 96) {
-    Speed = 100;
-  }
-  else if (Speed < FanMinimumProcent)
-  {
-    Speed = 0;
-  }
-  
-  OCR1A = (word) (Speed*TCNT1_TOP)/100;
-}
+#define TempX 0
+#define TempY 16
+#define HumiX 78
+#define HumiY 16
 
 void drawsreen() {
   display.clearDisplay();
@@ -94,9 +97,14 @@ void drawsreen() {
   display.setTextSize(2);      // Normal 1:1 pixel scale
   display.setTextColor(SSD1306_WHITE); // Draw white text
 
+  // Pot
+  display.setCursor(PotX, PotY);
+  display.print(Speed);
+  display.print("%");
+
   // Fan RPM
-  display.setCursor(FanRPMX + 16, FanRPMY);     
-  display.print(String(RPM));
+  display.setCursor(FanRPMX, FanRPMY);     
+  display.print(RPM);
   
   int fanindex = 0;
 
@@ -109,17 +117,30 @@ void drawsreen() {
   else if ( Speed > 0) {
     fanindex = 1;
   }
-
   const unsigned char * fan = epd_bitmap_allArray[fanindex];
+  display.drawBitmap(display.getCursorX(), display.getCursorY(), fan, 16, 16, 1);
 
-  display.drawBitmap(FanRPMX, FanRPMY, fan, 16, 16, 1);
+  // Temp
+  display.setCursor(TempX, TempY);
+  display.print(Temp, 1);
+  display.drawBitmap(display.getCursorX(), display.getCursorY(), epd_bitmap_celsius, 16, 16, 1);
 
-  // Pot pos
-  display.setCursor(0, 0);
-  display.print(String(Speed));
-  display.print("%");
+  // Humi
+  display.setCursor(HumiX, HumiY);
+  display.print(Humi, 0);
+  display.drawBitmap(display.getCursorX(), display.getCursorY(), epd_bitmap_Humidity, 16, 16, 1);
 
+  // Display screen
   display.display();
+}
+
+void setPwmDuty() {
+  Speed = map(analogRead(PotPin), 0, 1024, FanMinimumProcent, 100);
+  if(Speed > 96) {
+    Speed = 100;
+  }
+  
+  OCR1A = (word) (Speed*TCNT1_TOP)/100;
 }
 
 void ReadFanRPM() {
