@@ -5,13 +5,16 @@
 #include <Adafruit_SSD1306.h>
 #include <DHT.h>
 
+// Pins
 #define PotPin A3
 #define hallsensor 2
 #define OC1A_PIN 9
-#define FanMinimumProcent 8
-#define DHTPIN 5
+#define DHTPIN 4
 #define DHTTYPE DHT11
+#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 
+// Settings
+#define FanMinimumProcent 8
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
 
@@ -20,7 +23,6 @@
 // On an arduino UNO:       A4(SDA), A5(SCL)
 // On an arduino MEGA 2560: 20(SDA), 21(SCL)
 // On an arduino LEONARDO:   2(SDA),  3(SCL), ...
-#define OLED_RESET -1       // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -84,6 +86,8 @@ const unsigned char *epd_bitmap_allArray[4] = {
 #define PotWidth 4
 #define StartAngle 2.5
 #define EndAngle 6.9
+#define StepAngle 0.075
+#define StepPreFill 2
 
 #define FanRPMX 32
 #define FanRPMY 0
@@ -112,13 +116,29 @@ void drawsreen()
     float end_angle = big / step;
     int rtwo = PotR - PotWidth;
 
-    for (float i = StartAngle; i < end_angle; i = i + 0.025)
+    for (float i = StartAngle; i < end_angle; i = i + StepAngle)
     {
-      display.drawLine(PotX + cos(i) * PotR, PotY + sin(i) * PotR, PotX + cos(i) * rtwo, PotY + sin(i) * rtwo, WHITE);
+      display.fillTriangle(
+          PotX + cos(i) * PotR,
+          PotY + sin(i) * PotR,
+          PotX + cos(i) * rtwo,
+          PotY + sin(i) * rtwo,
+          PotX + cos(i + StepAngle * StepPreFill) * PotR,
+          PotY + sin(i + StepAngle * StepPreFill) * PotR,
+          WHITE);
+
+      display.fillTriangle(
+          PotX + cos(i) * PotR,
+          PotY + sin(i) * PotR,
+          PotX + cos(i) * rtwo,
+          PotY + sin(i) * rtwo,
+          PotX + cos(i + StepAngle * StepPreFill) * rtwo,
+          PotY + sin(i + StepAngle * StepPreFill) * rtwo,
+          WHITE);
     }
 
     // Border
-    for (float i = StartAngle; i < EndAngle; i = i + 0.025)
+    for (float i = StartAngle; i < EndAngle; i = i + StepAngle)
     {
       display.drawPixel(PotX + cos(i) * PotR, PotY + sin(i) * PotR, WHITE);
       display.drawPixel(PotX + cos(i) * rtwo, PotY + sin(i) * rtwo, WHITE);
@@ -218,10 +238,12 @@ void ReadDHT()
 void setup()
 {
   Serial.begin(9600);
+  Serial.println(F("And HeErReE we go"));
 
   pinMode(hallsensor, INPUT_PULLUP);
   pinMode(OC1A_PIN, OUTPUT);
   pinMode(PotPin, INPUT);
+  Serial.println(F("Pinmodes set"));
 
   // Clear Timer1 control and count registers
   TCCR1A = 0;
@@ -232,10 +254,13 @@ void setup()
   TCCR1A |= (1 << COM1A1) | (1 << WGM11);
   TCCR1B |= (1 << WGM13) | (1 << CS10);
   ICR1 = TCNT1_TOP;
+  Serial.println(F("Timer set"));
 
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+  Serial.println(F("Display Ready"));
   dht.begin();
+  Serial.println(F("DHT Ready"));
 }
 
 void loop()
